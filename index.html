@@ -202,6 +202,9 @@
   </div>
 </div>
 
+<div id="imgModal" onclick="closeImg()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.86);z-index:100;align-items:center;justify-content:center;padding:20px;cursor:zoom-out">
+  <img id="imgModalImg" src="" alt="" style="max-width:96%;max-height:96%;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,.5)">
+</div>
 <footer>
   <b>หจก. ฟ้าตระการ มอลล์</b> &nbsp;|&nbsp; 💬 LINE: @ubon474 &nbsp;|&nbsp; ☎️ 045481099<br>
   แคตตาล็อกอ้างอิงจากคู่มือรายการสิ่งอำนวยความสะดวก สื่อ บริการ และความช่วยเหลืออื่นใดทางการศึกษา (บัญชี ข.) พ.ศ. 2568 — สำนักบริหารงานการศึกษาพิเศษ สพฐ.<br>
@@ -339,7 +342,7 @@ function render(){
     const inCart=cart.includes(it.code);
     const staffRow=staff?`<div class="staffrow"><button class="btn btn-ghost btn-sm" onclick="editItem('${esc(it.code)}')">✏️ แก้ไข</button><button class="btn btn-red btn-sm" onclick="delItem('${esc(it.code)}')">🗑️ ลบ</button></div>`:'';
     return `<div class="card"><div class="imgbox">
-      <img src="${/^(https?:|data:)/i.test(it.img||'')?esc(it.img):'images/'+esc(it.img)}" alt="${esc(it.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <img src="${/^(https?:|data:)/i.test(it.img||'')?esc(it.img):'images/'+esc(it.img)}" alt="${esc(it.name)}" style="cursor:zoom-in" onclick="openImg(this.src)" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
       <div class="ph" style="display:none;flex-direction:column;align-items:center;justify-content:center;height:100%">🖼️<br>${esc(it.code)}<br><span style="font-size:12px">(วางรูปในโฟลเดอร์ images/)</span></div>
       <span class="badge">${esc(it.cat)}</span><span class="stat ${statusClass(it.status)}">${esc(it.status)}</span>
       </div><div class="body">
@@ -387,6 +390,9 @@ function sendCartLine(){
   window.open(lineURL(msg),'_blank');
 }
 function printAll(){clearFilters();setTimeout(()=>window.print(),200);}
+function openImg(src){if(!src)return;document.getElementById('imgModalImg').src=src;document.getElementById('imgModal').style.display='flex';}
+function closeImg(){document.getElementById('imgModal').style.display='none';}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeImg();});
 
 /* ---------- ปรับขนาดตัวอักษร ---------- */
 function setFont(scale){
