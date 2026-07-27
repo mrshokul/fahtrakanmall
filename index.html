@@ -139,7 +139,7 @@
       <h3 style="color:var(--orange)">🧑‍💼 <span id="staffFormTitle">ลงสินค้าใหม่</span></h3>
       <div class="form-grid">
         <div class="fld"><label>หมวด *</label><select id="f_cat" onchange="onCatChange()"></select></div>
-        <div class="fld"><label>รหัสสินค้า * <span style="font-weight:400;color:var(--muted);font-size:12px">(สร้างอัตโนมัติ แก้ได้)</span></label><input id="f_code" placeholder="เลือกหมวดเพื่อสร้างรหัส"></div>
+        <div class="fld"><label>รหัสสินค้า * <span style="font-weight:400;color:var(--muted);font-size:12px">(ระบบสร้างให้อัตโนมัติ)</span></label><input id="f_code" readonly placeholder="เลือกหมวดก่อน" style="background:#eef5fa;color:var(--blue-d);font-weight:700;cursor:not-allowed"></div>
         <div class="fld"><label>บาร์โค้ดจริง (ถ้ามี)</label><input id="f_barcode" placeholder="สแกน/พิมพ์เลขบาร์โค้ด"></div>
         <div class="fld"><label>ราคา (บาท) *</label><input id="f_price" type="number" min="0" placeholder="เช่น 500"></div>
         <div class="fld"><label>หน่วยนับ *</label><input id="f_unit" placeholder="เช่น ชิ้น / ชุด / เครื่อง"></div>
@@ -275,6 +275,7 @@ function updateAuthUI(){
   if(user){
     a.innerHTML=`<span style="font-size:14px">👤 ${escAttr(user.email)}</span> <button class="btn btn-white btn-sm" onclick="doLogout()">ออกจากระบบ</button>`;
     document.getElementById('staffPanel').classList.add('open');
+    if(!editingCode && !document.getElementById('f_code').value) resetForm();
   }else{
     a.innerHTML=`<button class="btn btn-white btn-sm" onclick="openLogin()">🔑 เข้าสู่ระบบเจ้าหน้าที่</button>`;
     document.getElementById('staffPanel').classList.remove('open');
