@@ -337,7 +337,7 @@ function render(){
     const inCart=cart.includes(it.code);
     const staffRow=staff?`<div class="staffrow"><button class="btn btn-ghost btn-sm" onclick="editItem('${esc(it.code)}')">✏️ แก้ไข</button><button class="btn btn-red btn-sm" onclick="delItem('${esc(it.code)}')">🗑️ ลบ</button></div>`:'';
     return `<div class="card"><div class="imgbox">
-      <img src="${/^https?:/i.test(it.img||'')?esc(it.img):'images/'+esc(it.img)}" alt="${esc(it.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <img src="${/^(https?:|data:)/i.test(it.img||'')?esc(it.img):'images/'+esc(it.img)}" alt="${esc(it.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
       <div class="ph" style="display:none;flex-direction:column;align-items:center;justify-content:center;height:100%">🖼️<br>${esc(it.code)}<br><span style="font-size:12px">(วางรูปในโฟลเดอร์ images/)</span></div>
       <span class="badge">${esc(it.cat)}</span><span class="stat ${statusClass(it.status)}">${esc(it.status)}</span>
       </div><div class="body">
@@ -421,7 +421,7 @@ function editItem(code){
   document.getElementById('f_price').value=it.price;document.getElementById('f_unit').value=it.unit;
   document.getElementById('f_img').value=it.img||'';document.getElementById('f_props').value=it.props||'';
   var _im=it.img||'';var _pv=document.getElementById('f_imgprev');
-  if(/^https?:/i.test(_im)){_pv.src=_im;_pv.style.display='';}else{_pv.style.display='none';}
+  if(/^(https?:|data:)/i.test(_im)){_pv.src=_im;_pv.style.display='';}else{_pv.style.display='none';}
   document.getElementById('f_imgfile').value='';document.getElementById('f_imgstatus').textContent=_im?'มีรูปอยู่แล้ว (อัปโหลดใหม่เพื่อเปลี่ยน)':'';
   document.getElementById('f_elig').value=it.eligible||'';document.getElementById('f_status').value=it.status||'มี';
   document.querySelectorAll('#f_dis input').forEach(c=>c.checked=(it.dis||[]).includes(c.value));
@@ -433,19 +433,28 @@ async function delItem(code){
   if(error){alert('ลบไม่สำเร็จ: '+error.message);return;}
   cart=cart.filter(c=>c!==code);
 }
-async function uploadImg(ev){
+function uploadImg(ev){
   const file=ev.target.files[0]; if(!file)return;
-  if(!LIVE||!user){alert('ต้องเข้าสู่ระบบเจ้าหน้าที่ก่อนอัปโหลดรูป');ev.target.value='';return;}
-  const st=document.getElementById('f_imgstatus'); st.textContent='กำลังอัปโหลด...';
-  const ext=(((file.name||'').split('.').pop())||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
-  const base=(document.getElementById('f_code').value.trim()||'img').replace(/[^a-zA-Z0-9_-]/g,'')||'img';
-  const path=base+'_'+Date.now()+'.'+ext;
-  const up=await sb.storage.from('product-images').upload(path,file,{upsert:true,contentType:file.type||'image/jpeg'});
-  if(up.error){st.textContent='อัปโหลดไม่สำเร็จ: '+up.error.message;return;}
-  const {data}=sb.storage.from('product-images').getPublicUrl(path);
-  document.getElementById('f_img').value=data.publicUrl;
-  const pv=document.getElementById('f_imgprev'); pv.src=data.publicUrl; pv.style.display='';
-  st.textContent='อัปโหลดสำเร็จ ✓';
+  const st=document.getElementById('f_imgstatus'); st.textContent='กำลังประมวลผลรูป…';
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const img=new Image();
+    img.onload=function(){
+      const max=800; let w=img.width, h=img.height;
+      if(w>max||h>max){ if(w>=h){h=Math.round(h*max/w);w=max;} else {w=Math.round(w*max/h);h=max;} }
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      let dataUrl;
+      try{ dataUrl=cv.toDataURL('image/jpeg',0.72); }catch(err){ dataUrl=e.target.result; }
+      document.getElementById('f_img').value=dataUrl;
+      const pv=document.getElementById('f_imgprev'); pv.src=dataUrl; pv.style.display='';
+      st.textContent='พร้อมใช้ ✓ ('+Math.round(dataUrl.length/1024)+' KB)';
+    };
+    img.onerror=function(){ st.textContent='ไฟล์รูปไม่ถูกต้อง'; };
+    img.src=e.target.result;
+  };
+  reader.onerror=function(){ st.textContent='อ่านไฟล์ไม่สำเร็จ'; };
+  reader.readAsDataURL(file);
 }
 async function saveItem(){
   if(!LIVE||!user){alert('กรุณาเข้าสู่ระบบเจ้าหน้าที่ก่อน');return;}
