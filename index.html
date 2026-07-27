@@ -138,8 +138,9 @@
     <div class="panel no-print" id="staffPanel">
       <h3 style="color:var(--orange)">🧑‍💼 <span id="staffFormTitle">ลงสินค้าใหม่</span></h3>
       <div class="form-grid">
-        <div class="fld"><label>รหัสสินค้า *</label><input id="f_code" placeholder="เช่น BH0120"></div>
-        <div class="fld"><label>หมวด *</label><select id="f_cat"></select></div>
+        <div class="fld"><label>หมวด *</label><select id="f_cat" onchange="onCatChange()"></select></div>
+        <div class="fld"><label>รหัสสินค้า * <span style="font-weight:400;color:var(--muted);font-size:12px">(สร้างอัตโนมัติ แก้ได้)</span></label><input id="f_code" placeholder="เลือกหมวดเพื่อสร้างรหัส"></div>
+        <div class="fld"><label>บาร์โค้ดจริง (ถ้ามี)</label><input id="f_barcode" placeholder="สแกน/พิมพ์เลขบาร์โค้ด"></div>
         <div class="fld"><label>ราคา (บาท) *</label><input id="f_price" type="number" min="0" placeholder="เช่น 500"></div>
         <div class="fld"><label>หน่วยนับ *</label><input id="f_unit" placeholder="เช่น ชิ้น / ชุด / เครื่อง"></div>
         <div class="fld"><label>สถานะ</label><select id="f_status"><option>มี</option><option>หมด</option><option>สั่งจอง</option></select></div>
@@ -323,7 +324,7 @@ function filtered(){
   return ITEMS.filter(it=>{
     if(fCats.size&&!fCats.has(it.cat))return false;
     if(fDis.size&&!(it.dis||[]).some(d=>fDis.has(d)))return false;
-    if(q){const hay=(it.code+' '+it.name+' '+it.props).toLowerCase();if(!hay.includes(q))return false;}
+    if(q){const hay=(it.code+' '+(it.barcode||'')+' '+it.name+' '+it.props).toLowerCase();if(!hay.includes(q))return false;}
     return true;
   });
 }
@@ -343,7 +344,7 @@ function render(){
       </div><div class="body">
       <div class="cat-tag">${esc(c[0])} · ${esc(c[1])}</div>
       <h4>${esc(it.name)}</h4>
-      <div class="code-line">รหัส <b>${esc(it.code)}</b></div>
+      <div class="code-line">รหัส <b>${esc(it.code)}</b>${it.barcode?' · บาร์โค้ด '+esc(it.barcode):''}</div>
       <div class="props">${esc(it.props)}</div>
       <div class="distags">${dis}</div>
       <div class="price">${Number(it.price).toLocaleString()} ฿ <small>/ ${esc(it.unit)}</small></div>
@@ -399,14 +400,25 @@ function buildStaffForm(){
   document.getElementById('f_cat').innerHTML=Object.keys(CATS).map(k=>`<option value="${k}">${k} — ${CATS[k][0]}</option>`).join('');
   document.getElementById('f_dis').innerHTML=DIS.map(d=>`<label><input type="checkbox" value="${d}">${d}</label>`).join('');
 }
+function genCode(cat){
+  const used=new Set();
+  ITEMS.forEach(it=>{const m=(it.code||'').match(new RegExp('^'+cat+'(\\d+)$'));if(m)used.add(parseInt(m[1],10));});
+  let n=1; while(used.has(n)) n++;
+  return cat+String(n).padStart(4,'0');
+}
+function onCatChange(){
+  if(editingCode) return;
+  document.getElementById('f_code').value=genCode(document.getElementById('f_cat').value);
+}
 function resetForm(){
   editingCode=null;
   document.getElementById('staffFormTitle').textContent='ลงสินค้าใหม่';
   document.getElementById('saveBtn').textContent='➕ เพิ่มลงแคตตาล็อก';
-  ['f_code','f_name','f_price','f_unit','f_img','f_props','f_elig'].forEach(id=>document.getElementById(id).value='');
+  ['f_code','f_name','f_price','f_unit','f_img','f_props','f_elig','f_barcode'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f_cat').selectedIndex=0;document.getElementById('f_status').selectedIndex=0;
   document.querySelectorAll('#f_dis input').forEach(c=>c.checked=false);
   document.getElementById('f_code').disabled=false;
+  document.getElementById('f_code').value=genCode(document.getElementById('f_cat').value);
   document.getElementById('f_imgfile').value='';
   document.getElementById('f_imgprev').style.display='none';
   document.getElementById('f_imgstatus').textContent='';
@@ -419,6 +431,7 @@ function editItem(code){
   document.getElementById('f_code').value=it.code;document.getElementById('f_code').disabled=true;
   document.getElementById('f_name').value=it.name;document.getElementById('f_cat').value=it.cat;
   document.getElementById('f_price').value=it.price;document.getElementById('f_unit').value=it.unit;
+  document.getElementById('f_barcode').value=it.barcode||'';
   document.getElementById('f_img').value=it.img||'';document.getElementById('f_props').value=it.props||'';
   var _im=it.img||'';var _pv=document.getElementById('f_imgprev');
   if(/^(https?:|data:)/i.test(_im)){_pv.src=_im;_pv.style.display='';}else{_pv.style.display='none';}
@@ -465,6 +478,7 @@ async function saveItem(){
   if(!code||!name||isNaN(price)||!unit){alert('กรุณากรอกช่องที่มี * ให้ครบ');return;}
   const obj={
     code,name,cat:document.getElementById('f_cat').value,price,unit,
+    barcode:document.getElementById('f_barcode').value.trim(),
     props:document.getElementById('f_props').value.trim(),
     eligible:document.getElementById('f_elig').value.trim(),
     dis:[...document.querySelectorAll('#f_dis input:checked')].map(c=>c.value),
@@ -472,9 +486,12 @@ async function saveItem(){
     status:document.getElementById('f_status').value,
     updated_at:new Date().toISOString()
   };
-  let error;
-  if(editingCode){({error}=await sb.from('products').update(obj).eq('code',editingCode));}
-  else{({error}=await sb.from('products').insert(obj));}
+  const doSave=o=>editingCode?sb.from('products').update(o).eq('code',editingCode):sb.from('products').insert(o);
+  let {error}=await doSave(obj);
+  if(error && (error.code==='42703' || /barcode/i.test(error.message||''))){
+    const o2={...obj}; delete o2.barcode; ({error}=await doSave(o2));
+    if(!error) alert('บันทึกแล้ว แต่ยังเก็บบาร์โค้ดไม่ได้ — ต้องเพิ่มคอลัมน์ barcode ในฐานข้อมูลก่อน (ดูวิธีที่แชต)');
+  }
   if(error){alert((error.code==='23505'?'รหัสนี้มีอยู่แล้ว':'บันทึกไม่สำเร็จ: '+error.message));return;}
   resetForm();
   alert(editingCode?'บันทึกการแก้ไขแล้ว':'เพิ่มสินค้าแล้ว: '+name);
@@ -483,9 +500,9 @@ async function saveItem(){
 /* ---------- export backup ---------- */
 function csvCell(v){v=(v==null?'':''+v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
 function exportCSV(){
-  const head=['รหัสสินค้า','ชื่อสินค้า','หมวด','คุณสมบัติ','ราคา','หน่วยนับ','ผู้ที่มีสิทธิขอรับ','ประเภทความพิการ','รูปภาพ','สถานะ'];
+  const head=['รหัสสินค้า','ชื่อสินค้า','หมวด','คุณสมบัติ','ราคา','หน่วยนับ','ผู้ที่มีสิทธิขอรับ','ประเภทความพิการ','รูปภาพ','สถานะ','บาร์โค้ด'];
   let out=head.join(',')+'\n';
-  ITEMS.forEach(it=>{out+=[it.code,it.name,it.cat,it.props,it.price,it.unit,it.eligible,(it.dis||[]).join('|'),it.img,it.status].map(csvCell).join(',')+'\n';});
+  ITEMS.forEach(it=>{out+=[it.code,it.name,it.cat,it.props,it.price,it.unit,it.eligible,(it.dis||[]).join('|'),it.img,it.status,it.barcode||''].map(csvCell).join(',')+'\n';});
   const blob=new Blob(['﻿'+out],{type:'text/csv;charset=utf-8;'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='สำรองข้อมูลสินค้า_'+new Date().toISOString().slice(0,10)+'.csv';
